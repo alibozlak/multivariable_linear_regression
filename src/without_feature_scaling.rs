@@ -1,9 +1,14 @@
 //! Multivariable linear regression trained with plain gradient descent, without any
 //! feature scaling.
 //!
-//! Every function works directly on the data set as it comes out of its JSON file :
-//! an object with an `inputs` array, whose rows carry [`N`] features each, and an
-//! `outputs` array carrying the expected value of the row at the same index.
+//! Every function works directly on the data set as it comes out of its JSON file,
+//! and the data set is expected to be already cleaned : `inputs` a non empty array
+//! of rows that all carry the same count of numbers, `outputs` an array of numbers
+//! of the same length as `inputs`. Nothing here tries to repair a data set that does
+//! not keep to that.
+//!
+//! The feature count `n` is not fixed in the code, it is read from the data set by
+//! [`n`], so the same functions fit a data set of any width.
 //!
 //! The partial derivatives the training uses are written down under `math/`.
 
@@ -11,11 +16,22 @@ use serde_json::Value;
 use std::io::{BufWriter, Write};
 
 /// `n` : how many features one sample of the data set has.
-pub const N: usize = 2;
+///
+/// It is the width of a row of `inputs`, which is what one set of coefficients has
+/// to cover. `outputs` is not the place to read it from : the length of `outputs` is
+/// `m`, the count of the samples.
+pub fn n(data_set: &Value) -> usize {
+    let (real_inputs, _) = validate_data_set(data_set);
+
+    real_inputs[0]
+        .as_array()
+        .unwrap_or_else(|| panic!("Real Inputs Array one sample must be an array!!"))
+        .len()
+}
 
 /// The prediction of the model for a single sample :
 /// `f(x) = a0*x0 + a1*x1 + ... + a(n-1)*x(n-1) + b`.
-pub fn f(coefficients_array: &[f64; N], constant_coefficient: f64, x_vector: &Value) -> f64 {
+pub fn f(coefficients_array: &[f64], constant_coefficient: f64, x_vector: &Value) -> f64 {
     let mut result = 0.0;
     for (i, a) in coefficients_array.iter().enumerate() {
         result += a * feature(x_vector, i);
@@ -24,7 +40,7 @@ pub fn f(coefficients_array: &[f64; N], constant_coefficient: f64, x_vector: &Va
 }
 
 /// The cost function `J` : mean of the squared errors over the whole data set.
-pub fn j(coefficients_array: &[f64; N], constant_coefficient: f64, data_set: &Value) -> f64 {
+pub fn j(coefficients_array: &[f64], constant_coefficient: f64, data_set: &Value) -> f64 {
     let (real_inputs, real_outputs) = validate_data_set(data_set);
 
     let mut j = 0.0;
@@ -38,17 +54,17 @@ pub fn j(coefficients_array: &[f64; N], constant_coefficient: f64, data_set: &Va
 
 /// Partial derivative of `J` with respect to the `j`-th coefficient `aj`.
 pub fn dj_daj(
-    coefficients_array: &[f64; N],
+    coefficients_array: &[f64],
     constant_coefficient: f64,
     data_set: &Value,
     j: usize,
 ) -> f64 {
     let (real_inputs, real_outputs) = validate_data_set(data_set);
 
-    if j >= N {
+    if j >= coefficients_array.len() {
         panic!(
             "Invalid j index : j must be in [0,{}] whole number!!",
-            N - 1
+            coefficients_array.len() - 1
         );
     }
 
@@ -62,7 +78,7 @@ pub fn dj_daj(
 }
 
 /// Partial derivative of `J` with respect to the constant coefficient `b`.
-pub fn dj_db(coefficients_array: &[f64; N], constant_coefficient: f64, data_set: &Value) -> f64 {
+pub fn dj_db(coefficients_array: &[f64], constant_coefficient: f64, data_set: &Value) -> f64 {
     let (real_inputs, real_outputs) = validate_data_set(data_set);
 
     let mut result = 0.0;
@@ -75,14 +91,24 @@ pub fn dj_db(coefficients_array: &[f64; N], constant_coefficient: f64, data_set:
 
 /// Runs `loop_count_for_train` gradient descent steps with the `alpha` learning rate,
 /// updating every coefficient simultaneously on each step.
+///
+/// `coefficients_array` is expected to be `n` long, and it carries the trained
+/// coefficients back to the caller together with `constant_coefficient`.
 pub fn train_data_set(
-    coefficients_array: &mut [f64; N],
+    coefficients_array: &mut [f64],
     constant_coefficient: &mut f64,
     data_set: &Value,
     loop_count_for_train: usize,
     alpha: f64,
 ) {
-    validate_data_set(data_set);
+    let expected_length = n(data_set);
+    if coefficients_array.len() != expected_length {
+        panic!(
+            "Coefficient array length and Data Set one sample array size must be equal!! : \
+             {} != {expected_length}",
+            coefficients_array.len()
+        );
+    }
 
     // One line is printed per loop, so a buffered writer is used instead of locking
     // and flushing stdout a million times.
@@ -98,7 +124,7 @@ pub fn train_data_set(
     )
     .expect("writing to stdout failed");
 
-    let mut temp_coefficient_array = [0.0; N];
+    let mut temp_coefficient_array = vec![0.0; coefficients_array.len()];
     for i in 0..loop_count_for_train {
         for (j, temp_aj) in temp_coefficient_array.iter_mut().enumerate() {
             *temp_aj = coefficients_array[j]
@@ -108,7 +134,7 @@ pub fn train_data_set(
         let temp_b = *constant_coefficient
             - alpha * dj_db(coefficients_array, *constant_coefficient, data_set);
 
-        *coefficients_array = temp_coefficient_array;
+        coefficients_array.copy_from_slice(&temp_coefficient_array);
         *constant_coefficient = temp_b;
 
         writeln!(
@@ -126,7 +152,7 @@ pub fn train_data_set(
 }
 
 /// The `a` coefficients written the way the Java implementation prints them.
-pub fn to_string_a_array(coefficients_array: &[f64; N]) -> String {
+pub fn to_string_a_array(coefficients_array: &[f64]) -> String {
     let coefficients: Vec<String> = coefficients_array.iter().map(|a| a.to_string()).collect();
     format!("[{}]", coefficients.join(", "))
 }
@@ -156,18 +182,7 @@ pub fn validate_data_set(data_set: &Value) -> (&[Value], &[Value]) {
 
 /// The `i`-th feature of one sample of the `inputs` array.
 fn feature(x_vector: &Value, i: usize) -> f64 {
-    let features = x_vector
-        .as_array()
-        .unwrap_or_else(|| panic!("Real Inputs Array one sample must be an array!!"));
-
-    if features.len() != N {
-        panic!(
-            "Real Inputs Array one sample array not correct size (!= {N}) !! : {}",
-            features.len()
-        );
-    }
-
-    features[i]
+    x_vector[i]
         .as_f64()
         .unwrap_or_else(|| panic!("Feature {i} of a Real Inputs Array sample is not a number!!"))
 }
