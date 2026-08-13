@@ -15,10 +15,10 @@
 use serde_json::Value;
 use std::path::Path;
 
-/// The default place the training data set is read from, relative to the project root.
-pub const DEFAULT_PATH: &str = "data/gemini_created_data_set.json";
-
 /// Reads the file at `path` and deserializes the data set out of it.
+///
+/// Which file that is, is the caller's business : this module knows how to turn JSON
+/// into a data set, not where the data set of a given program lives.
 ///
 /// # Panics
 ///
@@ -27,10 +27,15 @@ pub fn load(path: impl AsRef<Path>) -> Value {
     let path = path.as_ref();
 
     let json = std::fs::read_to_string(path).unwrap_or_else(|error| {
+        let working_directory = std::env::current_dir()
+            .map(|directory| directory.display().to_string())
+            .unwrap_or_else(|_| String::from("unknown"));
+
         panic!(
             "Data set file could not be read : {} ({error})\n\
-             Hint : the path is relative to the project root, run the program with `cargo run`.",
-            path.display()
+             Hint : a relative path is resolved from the working directory, which is {}.",
+            path.display(),
+            working_directory
         )
     });
 

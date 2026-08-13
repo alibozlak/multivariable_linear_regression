@@ -2,7 +2,8 @@ mod json_data_set;
 mod without_feature_scaling;
 
 fn main() {
-    let gemini_created_data_set = json_data_set::load(json_data_set::DEFAULT_PATH);
+    let data_set_path = "data/gemini_created_data_set.json";
+    let gemini_created_data_set = json_data_set::load(data_set_path);
 
     let learning_rate_alpha = 0.00003;
     let loop_count_for_train = 1_000_000;

@@ -32,6 +32,20 @@ pub fn n(data_set: &Value) -> usize {
 /// The prediction of the model for a single sample :
 /// `f(x) = a0*x0 + a1*x1 + ... + a(n-1)*x(n-1) + b`.
 pub fn f(coefficients_array: &[f64], constant_coefficient: f64, x_vector: &Value) -> f64 {
+    // The feature count of this sample, rather than a count assumed beforehand.
+    let sample_length = x_vector
+        .as_array()
+        .unwrap_or_else(|| panic!("Real Inputs Array one sample must be an array!!"))
+        .len();
+
+    if coefficients_array.len() != sample_length {
+        panic!(
+            "Coefficient array length and Data Set one sample array size must be equal!! : \
+             {} != {sample_length}",
+            coefficients_array.len()
+        );
+    }
+
     let mut result = 0.0;
     for (i, a) in coefficients_array.iter().enumerate() {
         result += a * feature(x_vector, i);
@@ -61,10 +75,11 @@ pub fn dj_daj(
 ) -> f64 {
     let (real_inputs, real_outputs) = validate_data_set(data_set);
 
-    if j >= coefficients_array.len() {
+    let feature_count = n(data_set);
+    if j >= feature_count {
         panic!(
             "Invalid j index : j must be in [0,{}] whole number!!",
-            coefficients_array.len() - 1
+            feature_count - 1
         );
     }
 
@@ -124,7 +139,7 @@ pub fn train_data_set(
     )
     .expect("writing to stdout failed");
 
-    let mut temp_coefficient_array = vec![0.0; coefficients_array.len()];
+    let mut temp_coefficient_array = vec![0.0; expected_length];
     for i in 0..loop_count_for_train {
         for (j, temp_aj) in temp_coefficient_array.iter_mut().enumerate() {
             *temp_aj = coefficients_array[j]
