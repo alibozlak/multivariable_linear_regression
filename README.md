@@ -1,17 +1,7 @@
 # Multivariable Linear Regression
 
-## My Agenda :
-
-### 1) Math Side has been studied.
-Source : [Click for review](https://drive.google.com/drive/u/0/folders/1IEetPFNjLVcCFDmxmHyjpin6YWfvlwHS)
-
-The partial derivatives used by the gradient descent are also written down under [`math/`](math).
-
-### 2) Written with Java.
-Source : [alibozlak/multivariable-linear-regression](https://github.com/alibozlak/multivariable-linear-regression)
-
-### 3) Written with Rust.
-Source : This repository :)
+Rust implementation of a multivariable linear regression fitted with plain gradient
+descent. The partial derivatives it is built on are written down under [`math/`](math).
 
 ## The Model
 
@@ -22,11 +12,24 @@ are the inputs, its monthly rental price is the expected output. The cost functi
 is the mean of the squared errors, and the `a` coefficients and `b` are fitted with
 plain gradient descent, **without any feature scaling**.
 
+## Layout
+
+| Path | Content |
+| --- | --- |
+| `src/main.rs` | Loads the data set and starts the training |
+| `src/without_feature_scaling.rs` | The model, the cost function, the partial derivatives and the training loop |
+| `src/data_set.rs` | Reading of the training data set from JSON |
+| `data/gemini_created_data_set.json` | The training data set itself |
+| `math/` | The partial derivatives of the cost function |
+
 ## Run
 
 ```sh
 cargo run --release
 ```
+
+The data set path is relative to the project root, so the program is expected to be
+started from there.
 
 One line is printed per gradient descent step and the training loop runs 1,000,000
 steps, so writing the output to a file is usually the more comfortable option :
