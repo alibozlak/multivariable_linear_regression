@@ -16,9 +16,8 @@ plain gradient descent, **without any feature scaling**.
 
 | Path | Content |
 | --- | --- |
-| `src/main.rs` | Loads the data set and starts the training |
+| `src/main.rs` | Reads the data set file and starts the training |
 | `src/without_feature_scaling.rs` | The model, the cost function, the partial derivatives and the training loop |
-| `src/data_set.rs` | Reading of the training data set from JSON |
 | `data/gemini_created_data_set.json` | The training data set itself |
 | `math/` | The partial derivatives of the cost function |
 
