@@ -3,6 +3,19 @@ use crate::without_feature_scaling::WithoutFeatureScaling;
 mod without_feature_scaling;
 mod dataset;
 
+/// Trains the model on the rental data set and prints the cost before and after.
+///
+/// Every sample is `[square meters, room count]` and its output is the rental
+/// price. Because the features are not scaled, the learning rate has to stay
+/// this small — a larger step makes the cost diverge instead of fall — and the
+/// price of that is a high iteration count.
+///
+/// The third argument of [`WithoutFeatureScaling::new`] is the starting point
+/// `[a_1, a_2, b]`. Instead of zeros it holds the coefficients of the previous
+/// run, so this run picks training up where the last one stopped. The block at
+/// the end of the function is the log of the runs so far: `J` keeps falling but
+/// ever more slowly, which is the typical picture of gradient descent on
+/// unscaled features.
 fn main() {
     let m2_and_room_count_datas :Vec<Vec<f64>> = dataset::gemini_created_inputs_data_set();
     let prices : Vec<f64> = dataset::gemini_created_outputs();
