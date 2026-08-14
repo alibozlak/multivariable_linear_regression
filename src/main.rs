@@ -2,6 +2,7 @@ use crate::without_feature_scaling::WithoutFeatureScaling;
 
 mod without_feature_scaling;
 mod dataset;
+mod json_converter;
 
 /// Trains the model on the rental data set and prints the cost before and after.
 ///
