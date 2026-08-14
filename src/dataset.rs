@@ -1,7 +1,19 @@
+//! The training set used by the model: a synthetic rental-price data set
+//! generated with Gemini.
+//!
+//! The data lives in fixed-size `const` arrays so that the sample count and the
+//! feature count are visible at compile time, and it is only turned into the
+//! `Vec` shape the model expects when it is handed over.
 
+/// Number of samples (`m`) in the data set. [`INPUTS`] and [`OUTPUTS`] must
+/// both have exactly this many entries.
 pub const SAMPLE_COUNT: usize = 100;
 
 /// Every sample is `[square meters, room count]`.
+///
+/// Note the very different ranges of the two features — roughly 40..185 versus
+/// 1..5. Precisely this imbalance is what a model without feature scaling has
+/// to cope with.
 #[rustfmt::skip]
 const INPUTS: [[f64; 2]; SAMPLE_COUNT] = [
     [55.0, 1.0], [130.0, 4.0], [85.0, 2.0], [45.0, 1.0], [110.0, 3.0],
@@ -27,6 +39,9 @@ const INPUTS: [[f64; 2]; SAMPLE_COUNT] = [
 ];
 
 /// The rental price belonging to the sample at the same index in [`INPUTS`].
+///
+/// Index `i` here is the `y^(i)` of `INPUTS[i]`; the two arrays are matched by
+/// position, so their order must never be changed independently.
 #[rustfmt::skip]
 const OUTPUTS: [f64; SAMPLE_COUNT] = [
     23000.0, 48500.0, 32000.0, 19500.0, 42000.0,
@@ -51,6 +66,10 @@ const OUTPUTS: [f64; SAMPLE_COUNT] = [
     28000.0, 55000.0, 38500.0, 31000.0, 75000.0,
 ];
 
+/// The input samples in the `Vec<Vec<f64>>` shape the model expects.
+///
+/// The model works with a feature count that is only known at run time, so the
+/// fixed-size arrays are copied into nested `Vec`s here.
 pub fn gemini_created_inputs_data_set() -> Vec<Vec<f64>> {
     INPUTS.iter().map(|sample| sample.to_vec()).collect()
 }
