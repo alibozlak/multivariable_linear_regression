@@ -1,8 +1,5 @@
-use crate::without_feature_scaling::WithoutFeatureScaling;
-
-mod without_feature_scaling;
-mod dataset;
-mod json_converter;
+use multivariable_linear_regression::dataset;
+use multivariable_linear_regression::without_feature_scaling::WithoutFeatureScaling;
 
 /// Trains the model on the rental data set and prints the cost before and after.
 ///

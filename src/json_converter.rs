@@ -16,11 +16,6 @@
 //! ```json
 //! { "last_coefficients": [375.13, -195.00, 1807.28] }
 //! ```
-//!
-//! Nothing in this crate's `main` calls into this module — it exists to be
-//! consumed from outside, so its items are exempted from the dead-code warning
-//! a binary target would otherwise raise for them.
-#![allow(dead_code)]
 
 use std::error::Error;
 use std::fmt;
@@ -107,10 +102,14 @@ impl From<serde_json::Error> for JsonConverterError {
 /// The data is validated first, so a successful return guarantees a non-empty
 /// set, one output per sample, and the same feature count on every sample.
 ///
-/// ```text
-/// let json = r#"{"inputs": [[55.0, 1.0]], "outputs": [23000.0]}"#;
-/// let (inputs, outputs) = json_converter::training_data_from_json(json)?;
-/// let mut model = WithoutFeatureScaling::new(inputs, outputs, vec![0.0; 3]);
+/// ```
+/// use multivariable_linear_regression::json_converter;
+///
+/// let json = r#"{"inputs": [[55.0, 1.0], [130.0, 4.0]], "outputs": [23000.0, 48500.0]}"#;
+/// let (inputs, outputs) = json_converter::training_data_from_json(json).unwrap();
+///
+/// assert_eq!(inputs, vec![vec![55.0, 1.0], vec![130.0, 4.0]]);
+/// assert_eq!(outputs, vec![23000.0, 48500.0]);
 /// ```
 pub fn training_data_from_json(
     json : &str
