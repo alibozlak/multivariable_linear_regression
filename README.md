@@ -64,16 +64,21 @@ temporary vector and only copies them back once the whole iteration is done.
 ```
 .
 ├── src
-│   ├── main.rs                      # Entry point: hyperparameters, training, run log
+│   ├── lib.rs                       # Library root: what the crate exposes
 │   ├── without_feature_scaling.rs   # The model: cost, derivatives, gradient descent
 │   ├── json_converter.rs            # JSON <-> the vectors the model works with
-│   └── dataset.rs                   # Synthetic rental data set (100 samples)
+│   ├── dataset.rs                   # Synthetic rental data set (100 samples)
+│   └── main.rs                      # CLI trainer built on the library, plus the run log
 ├── math
 │   ├── 001_dJ_daj_partial_derivative.pdf
 │   └── 002_dJ_db_partial_derivative.pdf
 ├── Cargo.toml
 └── README.md
 ```
+
+The package builds two targets from the same code: a library other crates can
+depend on, and a binary that trains on the bundled data set. The binary is just
+the library's first consumer, so anything it does is available to you too.
 
 The coefficients are kept in a single vector of length `n + 1`, laid out as
 `[a_1, ..., a_n, b]` — the last slot is the bias.
@@ -151,6 +156,29 @@ Three things worth reading out of this table:
 
 To continue training, copy the printed coefficients into the third argument of
 `WithoutFeatureScaling::new` in `src/main.rs` and run it again.
+
+## Using it as a dependency
+
+Add it to the `Cargo.toml` of the crate that needs it. There is no compiled
+artifact to install — Cargo fetches the source and links it into your binary:
+
+```toml
+[dependencies]
+# From a checkout on the same machine
+multivariable_linear_regression = { path = "../multivariable_linear_regression" }
+
+# Straight from git, no publishing needed
+multivariable_linear_regression = { git = "https://github.com/alibozlak/multivariable_linear_regression" }
+```
+
+```rust
+use multivariable_linear_regression::json_converter;
+use multivariable_linear_regression::without_feature_scaling::WithoutFeatureScaling;
+```
+
+Three modules are public: `without_feature_scaling` (the model, `std` only),
+`json_converter` (the JSON bridge), and `dataset` (the bundled samples, handy
+for trying the crate without supplying your own data).
 
 ## Using your own data
 
