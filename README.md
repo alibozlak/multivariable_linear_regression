@@ -1,7 +1,9 @@
 # Multivariable Linear Regression
 
-Multivariable linear regression written from scratch in Rust — no ML crates, no
-linear algebra library, not even a single dependency. Only `std`.
+Multivariable linear regression written from scratch in Rust — no ML crates and
+no linear algebra library. The model itself runs on `std` alone; the only
+dependencies in the project are `serde` and `serde_json`, and they are used
+solely by the JSON converter, never by the model.
 
 The goal of the project is not to get the best possible prediction, but to
 implement gradient descent step by step: the cost function, its partial
@@ -64,6 +66,7 @@ temporary vector and only copies them back once the whole iteration is done.
 ├── src
 │   ├── main.rs                      # Entry point: hyperparameters, training, run log
 │   ├── without_feature_scaling.rs   # The model: cost, derivatives, gradient descent
+│   ├── json_converter.rs            # JSON <-> the vectors the model works with
 │   └── dataset.rs                   # Synthetic rental data set (100 samples)
 ├── math
 │   ├── 001_dJ_daj_partial_derivative.pdf
@@ -78,7 +81,12 @@ The coefficients are kept in a single vector of length `n + 1`, laid out as
 ## Requirements
 
 * Rust 1.85 or newer (the crate uses edition 2024)
-* No further dependencies
+* `serde` and `serde_json`, pulled in by Cargo — needed by the JSON converter only
+
+`serde_json` is enabled with its `float_roundtrip` feature. Without it the
+parser is allowed to be off by one ULP when reading a float back, so coefficients
+written out and read in again would not be bit-identical to the ones training
+produced.
 
 ## Running it
 
@@ -163,7 +171,36 @@ let coefficients = model.train_model(0.000003, 1_000_000);
 `new` panics if the number of outputs does not match the number of input
 samples, or if the coefficient vector is not `n + 1` long.
 
-## Roadmap
+## JSON input and output
+
+`src/json_converter.rs` bridges JSON and the vectors the model works with, so a
+training set can come from a file or a request body instead of being compiled in.
+
+A training set goes in as:
+
+```json
+{
+  "inputs":  [[55.0, 1.0], [130.0, 4.0]],
+  "outputs": [23000.0, 48500.0]
+}
+```
+
+```rust
+let (inputs, outputs) = json_converter::training_data_from_json(&body)?;
+let mut model = WithoutFeatureScaling::new(inputs, outputs, vec![0.0; 3]);
+
+let last_coefficients = model.train_model(0.000003, 1_000_000);
+let json = json_converter::coefficients_to_json(&last_coefficients)?;
+// {"last_coefficients":[375.1373157216981,-195.00662490954502,1807.2879939508762]}
+```
+
+The converter validates before handing anything to the model and returns a
+`JsonConverterError` instead of panicking: it rejects an empty data set, a
+mismatch between the number of samples and the number of outputs, and samples
+whose feature counts differ from each other. That last check is one the model's
+own `validate_data_set` does not perform, since it reads the feature count from
+the first sample only. This matters when the JSON arrives from outside — a bad
+payload becomes an error you can map to a 400 rather than a panic.
 
 * [ ] A model **with** feature scaling, to compare convergence speed against the
       current one
