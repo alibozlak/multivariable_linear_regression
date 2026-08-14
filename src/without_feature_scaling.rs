@@ -43,14 +43,15 @@ impl WithoutFeatureScaling {
     /// starts from; it may be all zeros, or the output of an earlier training
     /// run so that training can be continued where it left off.
     ///
+    /// Validation also derives `m` and `n` from the data itself, so the struct
+    /// can never hold sizes that disagree with the vectors it stores.
+    ///
     /// Panics if the data set is inconsistent — see [`Self::validate_data_set`].
     pub fn new(
         real_inputs : Vec<Vec<f64>>,
         real_outputs : Vec<f64>,
         f_initial_coefficients : Vec<f64>
     ) -> WithoutFeatureScaling {
-        // Validation also derives m and n from the data, so the struct never
-        // holds sizes that disagree with the vectors themselves.
         let (real_inputs, real_outputs, m, n, initial_coefficients)
             = Self::validate_data_set(real_inputs, real_outputs, f_initial_coefficients);
         Self { real_inputs, real_outputs, m, n, coefficients: initial_coefficients }
@@ -69,23 +70,22 @@ impl WithoutFeatureScaling {
     /// "Batch" means every derivative is computed over all `m` samples, so one
     /// iteration is one pass over the whole training set. The loop runs a fixed
     /// number of times; there is no convergence check that could stop it early.
+    ///
+    /// The new values are collected in `temp_coefficients` instead of being
+    /// written straight into `self.coefficients`, which keeps the update
+    /// *simultaneous*: every derivative of one iteration is computed from the
+    /// same, still unchanged coefficients. Writing in place would make the
+    /// derivative of `a_2` already see the updated `a_1`, which is a different
+    /// algorithm. The step only takes effect once the whole iteration is done.
     pub fn train_model(&mut self, learning_rate : f64, loop_count : usize) -> Vec<f64> {
-        // The new values are collected here instead of being written straight
-        // into self.coefficients. That keeps the update *simultaneous*: every
-        // derivative of one iteration is computed from the same, still
-        // unchanged coefficients. Writing in place would make the derivative of
-        // a_2 already see the updated a_1, which is a different algorithm.
         let mut temp_coefficients  = vec![0.0; self.n + 1];
         for i in 0..loop_count {
-            // The n weights a_1..a_n.
             for j in 0..self.n {
                 temp_coefficients[j] = self.coefficients[j] - learning_rate * self.dJ_daj(j);
             }
 
-            // The bias b, which lives in the last slot of the vector.
             temp_coefficients[self.n] = self.coefficients[self.n] - learning_rate * self.dJ_db();
 
-            // Only now does the step actually take effect.
             for j in 0..(self.n + 1) {
                 self.coefficients[j] = temp_coefficients[j];
             }
@@ -100,15 +100,16 @@ impl WithoutFeatureScaling {
     /// dJ/da_j = (2/m) * sum over i of ( x_j^(i) * ( f(x^(i)) - y^(i) ) )
     /// ```
     ///
+    /// `i` walks over the samples while `j` — the feature being derived — stays
+    /// fixed. `f(i) - y^(i)` is the signed error of a prediction; multiplying it
+    /// by the feature value weights each sample by how much that feature
+    /// contributed to the error.
+    ///
     /// The step-by-step derivation from the limit definition is in
     /// `math/001_dJ_daj_partial_derivative.pdf`.
     fn dJ_daj(&self, j : usize) -> f64 {
         let mut result : f64 = 0.0;
-        // i walks over the samples while j — the feature being derived — is fixed.
         for i in 0..self.m {
-            // f(i) - y^(i) is the signed error of the prediction; multiplying it
-            // by the feature value weights each sample by how much that feature
-            // contributed to the error.
             result += self.real_inputs[i][j] * (self.f(i) - self.real_outputs[i]);
         }
 
@@ -156,11 +157,13 @@ impl WithoutFeatureScaling {
     ///
     /// Careful: this `m` parameter is a *sample index*, it shadows the field of
     /// the same name that holds the sample count.
+    ///
+    /// Both branches of the feature-count check are identical for now: the
+    /// second one is reserved for a vectorised (SIMD) implementation that should
+    /// pay off once there are enough features to amortise its setup cost. The
+    /// bias is added once at the end, outside the sum.
     fn f(&self, m : usize) -> f64 {
         let mut result : f64 = 0.0;
-        // Both branches are identical for now: the second one is reserved for a
-        // vectorised (SIMD) implementation that should pay off once there are
-        // enough features to amortise its setup cost.
         if self.n < 16 {
             for i in 0..self.n {
                 result += self.coefficients[i] * self.real_inputs[m][i];
@@ -172,7 +175,6 @@ impl WithoutFeatureScaling {
             }
         }
 
-        // The bias is added once at the end, outside the sum.
         result + self.coefficients[self.n]
     }
 
@@ -196,7 +198,6 @@ impl WithoutFeatureScaling {
     )
         -> (Vec<Vec<f64>>, Vec<f64>, usize, usize, Vec<f64>)
     {
-        // Every input sample must have exactly one expected output.
         let m : usize = real_inputs.len();
         if m != real_outputs.len() {
             panic!("Real Inputs and Output Sample size (m) not equal !!");
@@ -204,7 +205,6 @@ impl WithoutFeatureScaling {
 
         let n : usize = real_inputs[0].len();
 
-        // n weights + 1 bias.
         if n + 1 != initial_coefficients.len() {
             panic!("Feature count (n) and a real input sample size (n) not equal !!");
         }
