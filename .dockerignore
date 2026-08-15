@@ -1,0 +1,13 @@
+# Build artifacts. By far the largest thing in the repository — leaving this in
+# would ship hundreds of megabytes to the daemon on every build, and the image
+# compiles its own copy inside a cache mount anyway.
+target/
+
+# Version control and IDE metadata.
+.git/
+.gitignore
+.idea/
+
+# Documentation and the hand-written derivations: not needed to compile.
+math/
+README.md
